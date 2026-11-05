@@ -20,6 +20,8 @@ Requires OpenCode with Markdown agents, Task delegation, and agent permissions.
 Configuration loading is validated with OpenCode **1.19.5**. The optional installer
 and validation scripts require Python **3.9+** and use only the standard library.
 Runtime use requires only the ten Markdown definitions.
+Optional audit, evidence, checkpoint and evaluation helpers also use Python's
+standard library; repository snapshots and evaluation fixtures require Git.
 
 Clone this repository, then run from its root:
 
@@ -190,19 +192,52 @@ of substituting another role or claiming verification succeeded.
 
 ## Validate and maintain
 
+### Reliability and behavioral evaluation
+
+The ten roles and their permissions are preserved. New self-contained policy
+blocks require precise ownership packets, contract-first cross-component work,
+honest evidence gates and safe interruption reconciliation. See
+[workflow contract v1](docs/workflow-v1.md) for executable scope audits,
+validated JSON handoffs, completion gates, optional checkpoints, and the optional
+resolved edit-path restriction overlay. These helpers are optional companion
+tools, not automatically installed or enforced by a lifecycle hook.
+
+The [behavioral evaluation suite](evals/README.md) has 18 fixed scenarios,
+disposable fixtures, raw delegation/tool traces, write audits, manual review
+criteria, and baseline/candidate comparison. Live model calls are opt-in and
+may incur provider charges:
+
+```bash
+python3 evals/run.py --output /tmp/devteam-eval-offline
+python3 evals/run.py --live --scenario backend-fix --model provider/existing-model --output /tmp/devteam-eval-live
+```
+
+The first command honestly records **not_run**, not passing behavioral tests.
+Distinguish **static/resolved configuration checks**, **offline deterministic
+tests** of helpers and simulated traces, and **real model-backed behavior**.
+Even a live run stays inconclusive until its trace and scenario criteria are
+reviewed. No live baseline or efficiency improvement is claimed without runs.
+See [implementation verification record](docs/verification.md) for actual
+commands, results and unverified behavior.
+
 From this repository:
 
 ```bash
 python3 -m unittest discover -s tests -v
 python3 scripts/validate.py
+python3 scripts/policy.py
 ```
 
 The first command tests installation, idempotence, collision preflight, explicit
-updates, and symlink handling. The second asks OpenCode to resolve all ten agents
+updates, symlink handling, and offline audit/evidence/recovery invariants. The
+second asks OpenCode to resolve all ten agents
 and checks modes, visibility, exact prompts, model neutrality, edit/shell access,
 GitHub/Jira collaboration permissions, and allowed/denied delegation. It makes
 no model calls or authenticated GitHub/Jira requests and does not prove
 end-to-end model behavior.
+The third checks generated policy consistency. Canonical policy changes go in
+`policy/reliability-v1.md`; run `python3 scripts/policy.py --write` and review the
+ten generated blocks. Installed agents remain self-contained Markdown files.
 
 To inspect installation from a target project, run:
 
@@ -227,4 +262,11 @@ by this repository from your chosen installation directory, then restart OpenCod
 scripts/install.py  Global or project-local installer
 scripts/validate.py Resolved OpenCode configuration checks
 tests/              Installer regression checks
+scripts/workflow.py Scope audit, handoff/gate validation, checkpoint reconciliation
+scripts/isolation.py Optional exact edit-path overlay and resolved checks
+scripts/policy.py   Canonical policy generation/drift check
+policy/             Versioned source embedded into all ten prompts
+evals/              Fixed behavioral scenarios, opt-in live runner and review
+examples/           Versioned scope and handoff examples
+docs/               Workflow contract and verification record
 ```

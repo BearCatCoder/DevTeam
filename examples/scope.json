@@ -1,0 +1,6 @@
+{
+  "allowed": ["backend.py", "test_app.py"],
+  "prohibited": ["user-note.txt", "frontend.html"],
+  "section_review": [],
+  "owners": {"backend.py": "devteam-back-end-dev-engineer", "test_app.py": "devteam-qa-engineer"}
+}
