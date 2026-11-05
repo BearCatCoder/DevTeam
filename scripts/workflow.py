@@ -6,6 +6,7 @@ import hashlib
 import json
 import os
 from pathlib import Path, PurePosixPath
+import re
 import stat
 import subprocess
 import tempfile
@@ -16,6 +17,7 @@ ROLES = {"devteam-" + r for r in (
     "database-engineer", "dev-admin", "documentation-writer", "product-owner",
     "qa-engineer", "security-reviewer")}
 OUTCOMES = {"passed", "failed", "blocked", "not_run", "inconclusive"}
+STATE_ID = re.compile(r"^(head:[0-9a-f]{7,40};dirty:(unknown|true|false)|none|[0-9a-f]{64})$")
 
 
 def require(condition, message):
@@ -96,6 +98,7 @@ def validate_handoff(h, assignment=None):
     require(isinstance(h, dict) and h.get("version") == VERSION, "unsupported handoff version")
     for key in ("task_id", "summary", "state_id"):
         require(isinstance(h.get(key), str) and h[key], "missing " + key)
+    require(STATE_ID.fullmatch(h["state_id"]), "invalid state_id format")
     require(h.get("role") in ROLES, "unknown role")
     require(h.get("mode") in {"analyze", "implement", "test", "document"}, "invalid mode")
     require(h.get("status") in {"done", "blocked", "needs-owner"}, "invalid status")

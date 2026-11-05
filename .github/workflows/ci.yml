@@ -1,0 +1,55 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.9", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Unit tests (installer, workflow helpers, offline eval harness)
+        run: python3 -m unittest discover -s tests -v
+
+      - name: Policy drift check
+        run: python3 scripts/policy.py
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      # validate.py needs the OpenCode CLI. An install failure (registry or
+      # network outage) skips validation with a visible warning; a validation
+      # failure after a successful install still fails the job.
+      - name: Install OpenCode 1.19.5
+        id: opencode
+        continue-on-error: true
+        run: |
+          npm i -g opencode-ai@1.19.5
+          opencode --version
+
+      - name: Resolved agent validation (no model calls)
+        if: steps.opencode.outcome == 'success'
+        run: python3 scripts/validate.py
+
+      - name: Warn that resolved validation was skipped
+        if: steps.opencode.outcome != 'success'
+        run: |
+          echo "::warning title=validate.py skipped::OpenCode 1.19.5 could not be installed; resolved agent permissions and prompts were NOT validated in this run."
+          {
+            echo "### validate.py skipped"
+            echo "OpenCode 1.19.5 install failed, so resolved agent validation did not run. This job's green status does not cover agent permissions."
+          } >> "$GITHUB_STEP_SUMMARY"

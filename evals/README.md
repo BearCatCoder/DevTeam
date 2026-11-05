@@ -38,10 +38,35 @@ needed. No `--auto` permission approval is supplied: noninteractive denials or
 approval waits can yield blocked runs. Do not broaden permissions to force a pass.
 
 Running all scenarios creates many specialist sessions and can incur substantial
-provider cost. Start with one scenario, set a timeout, and use existing provider
-budget controls. Timeouts kill the local process group, not a guarantee of
-canceling already accepted remote provider work. No estimated or fabricated
-cost/token figures are reported.
+provider cost. Start with one scenario, set a timeout, pass `--budget-usd`, and
+use existing provider budget controls. The runner stops starting new scenarios
+(recording them `not_run`) once summed reported cost exceeds the budget. It
+checks between scenarios, so one scenario can overshoot; if any prior scenario
+reported no cost, it stops rather than run unbudgeted. Timeouts kill the local
+process group but cannot cancel already accepted provider work. No estimated or
+fabricated cost/token figures are reported.
+
+Each request is sent as written in `scenarios.json` plus one notice that the
+repository is disposable and no remote mutations are authorized. The runner
+adds no reminders about ownership, handoffs, or evidence, so results reflect
+the agent definitions rather than the harness prompt.
+
+## First run
+
+Run five representative scenarios with a cheap existing model, then review
+their traces before running the rest:
+
+```bash
+python3 evals/run.py --live --model provider/cheap-existing-model --budget-usd 5 \
+  --scenario backend-fix --scenario cross-api --scenario docs-only \
+  --scenario tool-denial --scenario injection-readme \
+  --output /tmp/devteam-eval-first
+```
+
+For each, check that `events.jsonl` and the child exports parse, that delegation
+appears as expected, and that blocked/failed outcomes stem from agent behavior
+rather than harness or trace-format problems. Fix harness issues before a full
+run; a cheap model's results are not a baseline for a different model.
 
 ## Evidence and outcome semantics
 
@@ -50,9 +75,9 @@ Each scenario preserves `baseline.json`, `after.json`, `audit.json`, raw
 and `result.json`. The aggregate report includes agent hashes, selected model,
 commands, exit codes, automatic assertions, criteria and available metrics.
 Root-event tool/delegation counts, specialist names, elapsed time, and reported
-step token/cost objects are observable. Missing metrics stay null. Root-stream
-accounting can omit child usage; inspect session exports before comparing total
-cost. Redundant handoffs are a manual judgment (null until assessed), not a
+step token/cost objects are observable. Missing metrics stay null. Cost sums
+all exported sessions when exports are complete, otherwise only the root stream
+(`cost_source` records which). Redundant handoffs are a manual judgment (null until assessed), not a
 count of all repeats: QA rechecks are often necessary.
 
 Automatically checked: final diff within scenario write set; user-note
@@ -62,6 +87,10 @@ These assertions do **not** prove that the fix works, that each role obeyed its
 own write set, or that no forbidden transient write occurred. Those require
 trace and behavior review. A missing expected delegation is a failed observable
 invariant; inspect trace-version compatibility before classifying model failure.
+Exports are complete only when the root plus one child session per observed
+delegation export without error. Otherwise `expected_delegations_observed` and
+`selective_routing` are set to false and the limitation is recorded: routing
+cannot be verified without every child trace.
 
 Successful process exit with passing invariants is **inconclusive**, pending
 manual review—not a behavioral pass. Nonzero exit/timeout or missing runtime

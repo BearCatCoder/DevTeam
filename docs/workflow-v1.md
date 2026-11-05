@@ -93,7 +93,8 @@ Additional role-specific fields are permitted. Unknown schema versions fail.
 | Required field | Type / rules |
 | --- | --- |
 | `version` | Integer `1` |
-| `task_id`, `summary`, `state_id` | Nonempty strings; use snapshot state ID for current evidence; unavailable state cannot support acceptance |
+| `task_id`, `summary` | Nonempty strings |
+| `state_id` | Must match `^(head:[0-9a-f]{7,40};dirty:(unknown\|true\|false)\|none\|[0-9a-f]{64})$` (see below) |
 | `role` | One of the nine exact specialist names |
 | `mode` | `analyze`, `implement`, `test`, `document` |
 | `status` | `done`, `blocked`, `needs-owner`; done means assignment finished, not accepted |
@@ -113,6 +114,17 @@ command requires exit code 0 and evidence; manual review has an empty command,
 null exit code, kind `review`, and evidence. Unrun/blocked checks have null exit
 codes. Every check's state ID must match its handoff. Never fabricate command
 execution to satisfy this schema.
+
+**state_id sources.** The coordinator puts a `state_id` in every packet, read
+with the read tool from `.git/HEAD` and the ref file it names, formatted
+`head:<sha>;dirty:unknown` (`none` without `.git`). Specialists copy it into the
+handoff and each check, so read-only roles without shell access can return
+`done`. A role that runs `scripts/workflow.py snapshot` may substitute the
+64-hex snapshot id and must say so in `limitations`. `analyze` and `document`
+handoffs never block on `state_id`. A `head:` id does not capture uncommitted
+changes, which is why it says `dirty:unknown`: it identifies the code version
+reviewed but does not prove the working tree was unchanged. Gate acceptance on
+the scope audit's snapshot id where precise state matters.
 
 ```bash
 python3 scripts/workflow.py handoff --input examples/handoff.json
@@ -193,8 +205,13 @@ restoration, or automatic recovery of a killed OpenCode process.
 
 ## P2: policy maintenance
 
-`policy/reliability-v1.md` is canonical. `python3 scripts/policy.py --write`
-regenerates only marked policy blocks; `python3 scripts/policy.py` checks drift.
-Tests also compare the repeated specialist collaboration policy. Installed
-Markdown stays self-contained; exact resolved prompt equality remains checked
-by the unchanged `scripts/validate.py`. Restart OpenCode after agent updates.
+`policy/reliability-v1.md` is canonical. Audience markers select which roles
+receive each section: `all` (trust boundary, handoff format, GitHub/Jira),
+`specialists` (`needs-owner` instead of questions), `writers` (back-end,
+front-end, database, QA, documentation writer: write-set rules), and
+`coordinator` (DevTeam only: packets, remote writes, scope audit, handoff rules,
+completion gates, checkpoints). `python3 scripts/policy.py --write` regenerates
+only the marked blocks; `python3 scripts/policy.py` checks drift. Tests check
+per-role rendering, section word limits, and prompt word budgets. Installed
+Markdown stays self-contained; `scripts/validate.py` still checks that the
+resolved prompt equals the source file. Restart OpenCode after agent updates.

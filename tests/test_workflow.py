@@ -9,6 +9,7 @@ import tempfile
 import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
+CURRENT = "head:abc1234;dirty:unknown"
 sys.path.insert(0, str(ROOT / "scripts"))
 import workflow as w
 import policy
@@ -17,8 +18,8 @@ import isolation
 
 def handoff(role="devteam-back-end-dev-engineer", kind="self_check"):
     h = json.loads((ROOT / "examples" / "handoff.json").read_text())
-    h.update(task_id=role, role=role, status="done", state_id="current", mode="test" if kind == "independent_qa" else "implement")
-    h["checks"][0].update(kind=kind, state_id="current", outcome="passed", exit_code=0, evidence=["checks.log:1"])
+    h.update(task_id=role, role=role, status="done", state_id=CURRENT, mode="test" if kind == "independent_qa" else "implement")
+    h["checks"][0].update(kind=kind, state_id=CURRENT, outcome="passed", exit_code=0, evidence=["checks.log:1"])
     h["criteria"][0]["outcome"] = "passed"
     h["limitations"] = []
     return h
@@ -103,7 +104,7 @@ class WorkflowTests(unittest.TestCase):
 
     def test_handoff_rejects_fabricated_pass_and_engineer_qa(self):
         w.validate_handoff(handoff())
-        for changes in ({"exit_code": 7}, {"evidence": []}, {"outcome": "not_run"}, {"state_id": "stale"}, {"kind": "independent_qa"}):
+        for changes in ({"exit_code": 7}, {"evidence": []}, {"outcome": "not_run"}, {"state_id": "head:def5678;dirty:unknown"}, {"kind": "independent_qa"}):
             h = handoff()
             h["checks"][0].update(changes)
             with self.subTest(changes=changes), self.assertRaises(ValueError):
@@ -114,6 +115,18 @@ class WorkflowTests(unittest.TestCase):
         h["changed"] = ["frontend.html"]
         with self.assertRaises(ValueError):
             w.validate_handoff(h)
+
+    def test_read_only_analyze_handoff_with_packet_state_id_is_done(self):
+        h = json.loads((ROOT / "examples" / "handoff.json").read_text())
+        h.update(role="devteam-architect", mode="analyze", status="done", changed=[],
+                 state_id="head:abc1234;dirty:unknown", checks=[], criteria=[], limitations=[],
+                 summary="Design complete; no files changed.")
+        h["scope"] = {"allowed": [], "prohibited": [], "section_review": [], "owners": {}}
+        w.validate_handoff(h)
+        for bad in ("unavailable", "head:XYZ;dirty:unknown", "head:abc1234;dirty:maybe"):
+            h["state_id"] = bad
+            with self.subTest(bad=bad), self.assertRaises(ValueError):
+                w.validate_handoff(h)
 
     def test_approved_assignment_cannot_be_expanded_by_handoff(self):
         h = handoff()
@@ -128,11 +141,11 @@ class WorkflowTests(unittest.TestCase):
             w.validate_handoff(h)
 
     def test_gates_require_independent_current_qa_and_risk_decisions(self):
-        packet = {"version": 1, "handoffs": [handoff()], "criteria": ["AC-1"], "state_id": "current",
+        packet = {"version": 1, "handoffs": [handoff()], "criteria": ["AC-1"], "state_id": CURRENT,
                   "assignments": {h["task_id"]: h for h in [handoff(), handoff("devteam-qa-engineer", "independent_qa")]},
                   "security": {"required": False, "reason": "arithmetic-only"},
                   "documentation": {"required": False, "reason": "no documented contract change"},
-                  "audit": {"status": "passed", "state_id": "current"}, "blockers": []}
+                  "audit": {"status": "passed", "state_id": CURRENT}, "blockers": []}
         with self.assertRaisesRegex(ValueError, "missing assignment handoff"):
             w.gates(packet)
         packet["handoffs"].append(handoff("devteam-qa-engineer", "independent_qa"))
@@ -142,7 +155,7 @@ class WorkflowTests(unittest.TestCase):
         self.assertTrue(w.gates(packet, self.root)["accepted"])
         (self.root / "checks.log").write_text("tampered evidence")
         self.assertFalse(w.gates(packet, self.root)["accepted"])
-        packet["state_id"] = "new-state"
+        packet["state_id"] = "head:def5678;dirty:unknown"
         self.assertFalse(w.gates(packet)["accepted"])
         packet["security"]["reason"] = ""
         with self.assertRaises(ValueError):
@@ -152,13 +165,58 @@ class WorkflowTests(unittest.TestCase):
         canonical = (ROOT / "policy" / "reliability-v1.md").read_text()
         agents = list((ROOT / ".opencode" / "agents").glob("*.md"))
         self.assertEqual(len(agents), 10)
-        collaboration = []
         for p in agents:
             text = p.read_text()
-            self.assertEqual(policy.render(text, canonical), text, p.name)
-            if p.name != "DevTeam.md":
-                collaboration.append(text.split("GitHub/Jira collaboration", 1)[1].split("supported by tool evidence.", 1)[0])
-        self.assertEqual(len(set(collaboration)), 1)
+            self.assertEqual(policy.render(text, policy.block_for(p.stem, canonical)), text, p.name)
+            body = text.split("---", 2)[2].split(policy.START, 1)[0]
+            # Generated block is the only collaboration copy; files open with role.
+            self.assertNotIn("collaboration is permitted", body, p.name)
+            self.assertEqual(text.count("GitHub/Jira:"), 1, p.name)
+            heading, _, rest = body.strip().partition("\n\n")
+            self.assertTrue(heading.startswith("# ") and "\n" not in heading, p.name)
+            self.assertFalse(rest.startswith(("#", "<!--")), p.name)
+
+    def test_policy_blocks_are_rendered_per_role(self):
+        canonical = (ROOT / "policy" / "reliability-v1.md").read_text()
+        block = {name: policy.block_for(name, canonical) for name in
+                 ("DevTeam", "devteam-product-owner", "devteam-back-end-dev-engineer", "devteam-documentation-writer")}
+        self.assertRegex(block["DevTeam"], r"\bgates\b")
+        self.assertIn("Checkpoints", block["DevTeam"])
+        self.assertNotIn("Edit only the packet", block["DevTeam"])
+        for name in ("devteam-product-owner", "devteam-back-end-dev-engineer", "devteam-documentation-writer"):
+            self.assertNotRegex(block[name], r"(?i)\bgates\b", name)
+            self.assertNotIn("Checkpoints", block[name], name)
+            self.assertIn("untrusted task", block[name], name)
+            self.assertIn("state_id", block[name], name)
+        self.assertNotIn("Edit only the packet", block["devteam-product-owner"])
+        self.assertIn("Edit only the packet", block["devteam-back-end-dev-engineer"])
+        self.assertIn("Edit only the packet", block["devteam-documentation-writer"])
+
+    def test_specialists_return_needs_owner_instead_of_asking(self):
+        rule = "return `status: needs-owner` with the exact question in `limitations`"
+        for p in (ROOT / ".opencode" / "agents").glob("*.md"):
+            text = " ".join(p.read_text().split())
+            if p.stem == "DevTeam":
+                self.assertNotIn(rule, text)
+            else:
+                self.assertIn(rule, text, p.name)
+                self.assertNotRegex(text, r"(?i)\bask (when|for|the user)\b", p.name)
+
+    def test_prompt_word_budgets_and_tiers(self):
+        for p in (ROOT / ".opencode" / "agents").glob("*.md"):
+            limit = 1400 if p.stem == "DevTeam" else 650
+            self.assertLessEqual(len(p.read_text().split()), limit, p.name)
+        coordinator = (ROOT / ".opencode" / "agents" / "DevTeam.md").read_text()
+        for tier in ("**Direct answer:**", "**Small:**", "**Medium:**", "**Large:**", "State the tier chosen"):
+            self.assertIn(tier, coordinator)
+
+    def test_policy_section_word_limits(self):
+        limits = {"all": [70, 90, 60], "writers": [90]}
+        seen = {"all": 0, "writers": 0}
+        for audience, text in policy.sections((ROOT / "policy" / "reliability-v1.md").read_text()):
+            if audience in limits:
+                self.assertLessEqual(len(text.split()), limits[audience][seen[audience]], text[:40])
+                seen[audience] += 1
 
     def test_isolation_overlay_denies_shell_and_other_owners(self):
         overlay = isolation.overlay(self.root, self.scope)
@@ -199,6 +257,31 @@ class EvalTests(unittest.TestCase):
         self.assertEqual(result["delegations"], 1)
         self.assertIsNone(result["cost"])
         self.assertIsNone(result["tokens"])
+
+    def test_prompt_has_no_coaching_beyond_notice(self):
+        import inspect
+        source = inspect.getsource(self.runner.execute)
+        self.assertIn('prompt = s["request"] + NOTICE', source)
+        for coaching in ("Assign role-specific ownership", "Return explicit handoffs", "actual check evidence"):
+            self.assertNotIn(coaching, inspect.getsource(self.runner))
+
+    def test_missing_child_exports_fail_routing_assertions(self):
+        self.assertTrue(self.runner.exports_complete(3, [], 2))
+        self.assertFalse(self.runner.exports_complete(2, [], 2))
+        self.assertFalse(self.runner.exports_complete(3, ["ses_x"], 2))
+        assertions = {"expected_delegations_observed": True, "selective_routing": True, "write_scope": True}
+        limitations = []
+        self.runner.require_export_coverage(assertions, False, ["ses_x"], limitations)
+        self.assertEqual(assertions, {"expected_delegations_observed": False, "selective_routing": False, "write_scope": True})
+        self.assertIn("ses_x", limitations[0])
+
+    def test_budget_stops_and_fails_closed_on_unknown_cost(self):
+        stop = self.runner.budget_stop
+        self.assertIsNone(stop([], None))
+        self.assertIsNone(stop([{"metrics": {"cost": 0.4}}], 1.0))
+        self.assertIn("exceeded", stop([{"metrics": {"cost": 0.6}}, {"metrics": {"cost": 0.6}}], 1.0))
+        self.assertIn("no cost", stop([{"metrics": {"cost": None}}], 1.0))
+        self.assertIn("no cost", stop([{"metrics": None, "cost_unknown": True}], 1.0))
 
     def test_fixtures_are_deterministic_and_include_dirty_user_state(self):
         scenario = next(s for s in json.loads((ROOT / "evals" / "scenarios.json").read_text()) if s["id"] == "resume")

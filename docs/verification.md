@@ -77,3 +77,54 @@ iteration also passed. No application validation was weakened to satisfy tests.
 
 Restart OpenCode after installing or updating the agent definitions. Running
 sessions keep their previously loaded prompts.
+
+## Update round 2 (2026-11-05, baseline `162ebac`)
+
+Changes are uncommitted in the working tree for review. Tasks 1-9, 11, and 12
+were implemented; Task 10 (enforcement plugin) was **deferred by user decision**,
+so the contract remains prompt-required and not intercepted by a lifecycle hook.
+
+After every task, all three required commands passed before the next task:
+`python3 -m unittest discover -s tests`, `python3 scripts/validate.py`,
+`python3 scripts/policy.py`. Intermediate failures, and how each was resolved
+without weakening a check:
+
+- Task 3: the new per-role test matched "gates" inside "delegates", and the
+  "no hand-written GitHub/Jira copy" test matched legitimate coordinator
+  routing text. Both matchers were narrowed to what they meant to check (word
+  boundary; the removed paragraph's wording).
+- Task 5: the new no-asking test matched my own policy sentence "You cannot ask
+  the user questions"; the policy was reworded, the test kept.
+- Task 1: existing tests and `examples/handoff.json` used free-form state ids
+  (`current`, `unavailable-example-only`) that the new format rejects; they now
+  use valid ids (`head:abc1234;dirty:unknown`, `none`).
+
+Final results:
+
+| Command | Outcome |
+| --- | --- |
+| `python3 -m unittest discover -s tests` | **PASS, 31 tests** |
+| `python3 scripts/validate.py` | **PASS, all ten agents**, including new git/gh denies for every agent and `question` limited to DevTeam |
+| `python3 scripts/policy.py` | **PASS** |
+| `python3 scripts/isolation.py --root . --scope examples/scope.json --verify` | **PASS** (overlay still resolves with the new bash rule objects) |
+| `python3 scripts/workflow.py handoff --input <done architect analyze handoff>` | **PASS**: a read-only role can now return `done` |
+| `python3 evals/run.py --budget-usd 1 --output /tmp/opencode/devteam-eval-offline-final` | 18 scenarios **not_run**; no model calls |
+| `npm view opencode-ai@1.19.5 version` | `1.19.5` exists (CI install target) |
+| Python 3.9 compatibility | **Static only**: every `.py` file parses with the 3.9 grammar (`ast.parse(..., feature_version=(3, 9))`). No 3.9 interpreter was available and none was installed; CI's 3.9 job is the first real run |
+| `.github/workflows/ci.yml` | YAML parses; **not run on GitHub** (nothing pushed) |
+| `git diff --check` | **PASS** |
+
+Prompt size (`wc -w`): DevTeam 1,956 -> 1,397; specialists 907-1,477 -> 438-649;
+total 11,659 -> 6,434. "do not / never / cannot" occurrences: 168 -> 109.
+
+Not demonstrated: any live model behavior, including whether shorter prompts,
+work tiers, the needs-owner rule, or engineer-authored unit tests change
+outcomes. Live evaluations remain not run.
+
+Known limitations introduced or kept this round:
+
+- `head:<sha>;dirty:unknown` identifies the commit, not uncommitted changes.
+- Permission denies match command prefixes only; rewritten forms such as
+  `git -C dir push` or `sh -c` are still stopped only by the prompts.
+- Budget enforcement checks between scenarios, so one scenario can overshoot.
+  It fails closed when a run reports no cost.

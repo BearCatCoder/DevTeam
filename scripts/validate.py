@@ -21,6 +21,13 @@ WRITERS = {
     "devteam-database-engineer", "devteam-documentation-writer", "devteam-qa-engineer",
 }
 RUNNERS = WRITERS - {"devteam-documentation-writer"}
+# Defense in depth for every agent; prompts forbid these too. Pattern rules do
+# not catch rewritten forms (for example `git -C dir push` or `sh -c`).
+DENIED_COMMANDS = (
+    "git push", "git push origin main", "git commit -m x", "git reset --hard HEAD",
+    "git checkout -- file", "git clean -fdx", "rm -rf build", "gh pr merge 1",
+    "gh release create v1", "gh repo delete owner/repo", "gh repo create name",
+)
 
 
 def permission(agent, tool, target="*"):
@@ -47,15 +54,19 @@ def check(name):
     assert permission(agent, "bash") == ("ask" if name in RUNNERS else "deny")
     assert permission(agent, "bash", "gh issue list") == "ask"
     assert permission(agent, "bash", "gh pr comment 42 --body review") == "ask"
-    for command in ("git push", "python3 script.py", "gh-unrelated command"):
+    for command in ("python3 script.py", "gh-unrelated command"):
         assert permission(agent, "bash", command) == (
             "ask" if name in RUNNERS else "deny"
         ), f"{name}: unexpected shell permission for {command}"
+    for command in DENIED_COMMANDS:
+        assert permission(agent, "bash", command) == "deny", f"{name}: {command} not denied"
     for tool in ("github_get_issue", "github_create_pull_request",
                  "jira_get_issue", "jira_update_issue", "atlassian_transition_issue"):
         assert permission(agent, tool) == "ask", f"{name}: {tool} unavailable"
     assert permission(agent, "unrelated_update_issue") == "deny"
     assert permission(agent, "read") == "allow"
+    # Only the coordinator interacts with the user; specialists return needs-owner.
+    assert permission(agent, "question") == ("allow" if name == "DevTeam" else "deny"), f"{name}: question"
     assert permission(agent, "unconfigured_mcp_tool") == "deny"
     assert permission(agent, "task", "general") == "deny"
     assert permission(agent, "task", "DevTeam") == "deny"

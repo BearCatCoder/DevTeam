@@ -5,7 +5,7 @@
   "mode": "implement",
   "status": "blocked",
   "summary": "Illustrative blocked handoff; no code changed or checks run.",
-  "state_id": "unavailable-example-only",
+  "state_id": "none",
   "reviewed": ["backend.py"],
   "changed": [],
   "scope": {"allowed": ["backend.py"], "prohibited": [], "section_review": [], "owners": {"backend.py": "devteam-back-end-dev-engineer"}},
@@ -13,7 +13,7 @@
   "contracts": [],
   "next_owner": "devteam-qa-engineer",
   "criteria": [{"id": "AC-1", "outcome": "blocked", "checks": ["C-1"]}],
-  "checks": [{"id": "C-1", "kind": "self_check", "command": "python3 -B -m unittest -v", "exit_code": null, "outcome": "blocked", "evidence": [], "state_id": "unavailable-example-only"}],
+  "checks": [{"id": "C-1", "kind": "self_check", "command": "python3 -B -m unittest -v", "exit_code": null, "outcome": "blocked", "evidence": [], "state_id": "none"}],
   "findings": [],
   "risks": [],
   "limitations": ["Example only: runtime unavailable, snapshot not captured."]
