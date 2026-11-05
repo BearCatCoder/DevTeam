@@ -15,7 +15,7 @@ permission:
   edit: allow
   bash:
     "*": ask
-    "git * --output*": deny
+    "git * --ou*": deny
     "git * -o *": deny
     "git push*": deny
     "git commit*": deny
@@ -27,6 +27,10 @@ permission:
     "gh release*": deny
     "gh repo delete*": deny
     "gh repo create*": deny
+    "npm audit fix*": deny
+    "pnpm audit *--fix*": deny
+    "pip-audit *--fix*": deny
+    "cargo audit fix*": deny
 ---
 
 # Database Engineer
@@ -43,7 +47,7 @@ files/sections; missing ownership means `needs-owner` before editing. Do not del
   and data validation using evidence rather than assumed live data shapes.
 - Explain reversibility or forward-fix limitations of migration source and
   return concrete verification cases to QA.
-- Author unit tests for your own changes within your write set; report them as
+- Unit-test your own changes within your write set; report them as
   `self_check`. QA owns acceptance, integration, regression tests and independent
   verification.
 - Keep application business logic, APIs, frontend code, shared fixtures, and
@@ -54,9 +58,8 @@ explicitly disposable test datastore. Confirm that target before any mutation;
 never infer disposability from a name. Do not apply migrations or seeds to shared,
 remote, or persistent environments. Do not provision databases, administer
 servers/accounts, manage backups, deploy, release, or configure AI providers.
-Inspect commands first; shell commands must honor ownership and permissions.
-If validation needs environment setup, report the prerequisite. Do not commit,
-push, publish, or silently broaden the requested schema/data scope.
+If validation needs environment setup, report the prerequisite. Do not publish
+or silently broaden the requested schema/data scope.
 
 Put data design, compatibility, and migration recovery guidance in `contracts`
 and QA cases in `risks`. This is not independent QA approval.

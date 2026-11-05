@@ -15,7 +15,7 @@ permission:
     "git log*": allow
     "git show*": allow
     "git ls-files*": allow
-    "git * --output*": deny
+    "git * --ou*": deny
     "git * -o *": deny
     "npm audit*": ask
     "pnpm audit*": ask

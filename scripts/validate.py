@@ -27,13 +27,16 @@ DENIED_COMMANDS = (
     "git push", "git push origin main", "git commit -m x", "git reset --hard HEAD",
     "git checkout -- file", "git clean -fdx", "rm -rf build", "gh pr merge 1",
     "gh release create v1", "gh repo delete owner/repo", "gh repo create name",
-    # git diff/log/show can write files with --output/-o.
+    # git diff/log/show can write files with --output/-o, including the
+    # unambiguous long-option prefixes git accepts (--out, --outp, --ou).
     "git diff --output=x", "git log -o x", "git show --output x HEAD",
+    "git diff --out=x", "git log --outp x", "git show --ou x HEAD",
 )
 # Read-only git inspection: allowed for the coordinator and read-only roles,
 # `ask` for runners (their "*": ask), denied for the documentation writer.
+# `git log --oneline` guards against an over-broad `--o*` output deny.
 GIT_READ = ("git status --porcelain", "git diff --stat", "git rev-parse HEAD", "git log -1",
-            "git show HEAD", "git ls-files")
+            "git show HEAD", "git ls-files", "git log --oneline -5")
 READ_ONLY = set(NAMES) - WRITERS
 
 
@@ -70,16 +73,17 @@ def check(name):
     git_read = "allow" if name in READ_ONLY else "ask" if name in RUNNERS else "deny"
     for command in GIT_READ:
         assert permission(agent, "bash", command) == git_read, f"{name}: {command}"
-    # Dependency audits: reviewer may run them (with approval) but never fixers.
+    # Dependency audits: reviewer and runners may run them (with approval).
     reviewer = name == "devteam-security-reviewer"
     for command in ("npm audit", "pip-audit", "dotnet list package --vulnerable",
                     "pnpm audit --prod", "cargo audit", "govulncheck ./..."):
         expected = "ask" if reviewer or name in RUNNERS else "deny"
         assert permission(agent, "bash", command) == expected, f"{name}: {command}"
-    if reviewer:
-        for command in ("npm audit fix", "npm audit fix --force", "pnpm audit --fix",
-                        "pip-audit -r requirements.txt --fix", "cargo audit fix"):
-            assert permission(agent, "bash", command) == "deny", f"{name}: {command}"
+    # Audit fixers are denied for all ten: explicit rules for the reviewer and
+    # runners, "*": deny for the other roles.
+    for command in ("npm audit fix", "npm audit fix --force", "pnpm audit --fix",
+                    "pip-audit -r requirements.txt --fix", "cargo audit fix"):
+        assert permission(agent, "bash", command) == "deny", f"{name}: {command}"
     # Allow rules are read-only commands only; other git verbs stay denied/ask.
     for command in ("git add .", "git stash", "git branch -D x", "git -C x status"):
         assert permission(agent, "bash", command) == ("ask" if name in RUNNERS else "deny"), f"{name}: {command}"

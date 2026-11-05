@@ -18,7 +18,8 @@ deployment, publishing, and release management are outside the team's scope.
 
 Requires OpenCode with Markdown agents, Task delegation, and agent permissions.
 Configuration loading is validated with OpenCode **1.19.5**. The optional installer
-and validation scripts require Python **3.9+** and use only the standard library.
+and validation scripts require Python **3.9+** (CI-verified on 3.9 and 3.12) and
+use only the standard library.
 Runtime use requires only the ten Markdown definitions.
 Optional audit, evidence, checkpoint and evaluation helpers also use Python's
 standard library; repository snapshots and evaluation fixtures require Git.
@@ -188,18 +189,20 @@ OpenCode enforces these tool/delegation restrictions:
 - Specialists cannot delegate to each other, back to DevTeam, or to generic agents.
 - Product owner, architect, dev-admin, and security reviewer have no local edit access.
 - The coordinator and these four specialists have read-only git inspection
-  (`status`, `diff`, `rev-parse`, `log`, `show`, `ls-files`; `--output` denied)
+  (`status`, `diff`, `rev-parse`, `log`, `show`, `ls-files`; `--output` and its
+  abbreviations denied)
   plus `gh *` with approval. The documentation writer has only `gh *` with
   approval.
 - The documentation writer has local edit access for its assigned documents.
 - Implementation and QA agents have edit access and `bash: "*": ask` for local
-  checks (git `--output`/`-o` forms are denied). A command may require
+  checks (git `--output`/`-o` forms and `--ou*` abbreviations are denied). A command may require
   approval; denied commands are reported as blocked.
 - The security reviewer may also run dependency audits (`npm audit`,
   `pnpm audit`, `yarn npm audit`, `pip-audit`, `dotnet list ... --vulnerable`,
   `cargo audit`, `bundle audit`, `govulncheck`) with approval; their fixer
   forms (`npm audit fix`, `pnpm audit --fix`, `pip-audit --fix`,
-  `cargo audit fix`) are denied.
+  `cargo audit fix`) are denied for the reviewer and the implementation/QA
+  agents.
 - Every agent denies `git push*`, `git commit*`, `git reset --hard*`,
   `git checkout -- *`, `git clean*`, `rm -rf *`, `gh pr merge*`, `gh release*`,
   `gh repo delete*`, and `gh repo create*`. These denies come after the broader

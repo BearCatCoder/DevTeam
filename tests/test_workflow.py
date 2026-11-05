@@ -301,6 +301,29 @@ class EvalTests(unittest.TestCase):
         self.assertIn("no cost", stop([{"metrics": {"cost": None}}], 1.0))
         self.assertIn("no cost", stop([{"metrics": None, "cost_unknown": True}], 1.0))
 
+    def test_budget_comes_from_config_unless_cli_overrides(self):
+        resolve = self.runner.resolve_budget
+        with tempfile.TemporaryDirectory() as tmp:
+            config = Path(tmp) / "config.json"
+            self.assertEqual(resolve(None, config), (None, None))  # no file, no flag
+            config.write_text('{"budget_usd": 3}')
+            self.assertEqual(resolve(None, config), (3.0, str(config)))
+            self.assertEqual(resolve(1.5, config), (1.5, "--budget-usd"))
+            config.write_text('{"budget_usd": null}')
+            self.assertEqual(resolve(None, config), (None, str(config)))
+            for bad in ('{"budget_usd": 0}', '{"budget_usd": -1}', '{"budget_usd": "5"}', '{"budget_usd": true}'):
+                config.write_text(bad)
+                with self.assertRaises(ValueError):
+                    resolve(None, config)
+        shipped = json.loads((ROOT / "evals" / "config.json").read_text())
+        self.assertIsNotNone(resolve(None, ROOT / "evals" / "config.json")[0], shipped)
+
+    def test_trace_records_models_actually_used(self):
+        events = [{"part": {"type": "step-finish"}}, {"info": {"providerID": "p", "modelID": "m-1"}},
+                  {"info": {"providerID": "q", "modelID": "m-2"}}, {"info": {"providerID": "p", "modelID": "m-1"}}]
+        self.assertEqual(self.runner.observations(events)["models"], ["p/m-1", "q/m-2"])
+        self.assertEqual(self.runner.observations([])["models"], [])
+
     def test_fixtures_are_deterministic_and_include_dirty_user_state(self):
         scenario = next(s for s in json.loads((ROOT / "evals" / "scenarios.json").read_text()) if s["id"] == "resume")
         with tempfile.TemporaryDirectory() as first, tempfile.TemporaryDirectory() as second:

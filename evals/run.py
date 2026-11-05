@@ -13,6 +13,7 @@ import tempfile
 import time
 
 ROOT = Path(__file__).resolve().parents[1]
+CONFIG = ROOT / "evals" / "config.json"
 sys.path.insert(0, str(ROOT / "scripts"))
 from workflow import atomic_json, audit, snapshot
 from install import install
@@ -71,7 +72,11 @@ def observations(events):
     delegates = [v for v in tools if v["tool"] == "task"]
     roles = [v.get("state", {}).get("input", {}).get("subagent_type") for v in delegates]
     steps = [v for e in events for v in walk(e) if v.get("type") == "step-finish"]
+    # Provider/model as recorded in the trace: the run uses whatever the operator selected.
+    models = {"%s/%s" % (v["providerID"], v["modelID"]) for e in events for v in walk(e)
+              if isinstance(v.get("providerID"), str) and isinstance(v.get("modelID"), str)}
     return {"tool_calls": len(tools), "delegations": len(delegates), "specialists": sorted(set(r for r in roles if r)),
+            "models": sorted(models),
             "redundant_handoffs": None, "tokens": [v.get("tokens") for v in steps] or None,
             "cost": sum(v["cost"] for v in steps if isinstance(v.get("cost"), (int, float))) if any("cost" in v for v in steps) else None}
 
@@ -158,6 +163,8 @@ def execute(s, out, args):
         shutil.copytree(root, out / "workspace", ignore=shutil.ignore_patterns(".git"))
         metrics = observations(events)
         complete = exports_complete(len(exported_data), failed_exports, metrics["delegations"])
+        if exported_data:
+            metrics["models"] = sorted(set(metrics["models"]) | set(observations(exported_data)["models"]))
         if exported_data and complete:
             metrics["cost"] = observations(exported_data)["cost"]
             metrics["cost_source"] = "all exported sessions"
@@ -191,6 +198,21 @@ def budget_stop(results, budget):
     return "budget exceeded: spent %.4f of %.4f USD" % (spent, budget) if spent > budget else None
 
 
+def resolve_budget(cli_value, config_path):
+    """CLI --budget-usd wins; otherwise the config file's budget_usd (null = no ceiling)."""
+    if cli_value is not None:
+        value, source = cli_value, "--budget-usd"
+    elif config_path.is_file():
+        value, source = json.loads(config_path.read_text()).get("budget_usd"), str(config_path)
+    else:
+        return None, None
+    if value is None:
+        return None, source
+    if isinstance(value, bool) or not isinstance(value, (int, float)) or value <= 0:
+        raise ValueError("budget_usd must be a positive number or null (%s)" % source)
+    return float(value), source
+
+
 def main():
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("--live", action="store_true", help="Opt in to paid model calls with existing credentials")
@@ -200,8 +222,13 @@ def main():
     p.add_argument("--agents", type=Path, default=ROOT / ".opencode" / "agents", help="Frozen baseline or candidate definitions")
     p.add_argument("--compare", type=Path, help="Prior report.json; compare raw results, not invented improvements")
     p.add_argument("--timeout", type=int, default=300)
-    p.add_argument("--budget-usd", type=float, help="Stop starting scenarios once summed reported cost exceeds this")
+    p.add_argument("--budget-usd", type=float, help="Stop starting scenarios once summed reported cost exceeds this; overrides the config file")
+    p.add_argument("--config", type=Path, default=CONFIG, help="JSON file with budget_usd (default: evals/config.json)")
     a = p.parse_args()
+    try:
+        a.budget_usd, budget_source = resolve_budget(a.budget_usd, a.config)
+    except ValueError as e:
+        p.error(str(e))
     if a.output.exists() or ROOT == a.output.resolve() or ROOT in a.output.resolve().parents:
         p.error("output must be a new directory outside source repository")
     scenarios = json.loads((ROOT / "evals" / "scenarios.json").read_text())
@@ -228,7 +255,9 @@ def main():
                       "criteria": s["criteria"], "assertions": {}, "metrics": None, "quality": "unreviewed"}
         atomic_json(out / "result.json", result)
         results.append(result)
-    report = {"version": 1, "kind": "live" if a.live else "not_run", "model": a.model, "budget_usd": a.budget_usd,
+    report = {"version": 1, "kind": "live" if a.live else "not_run", "model": a.model,
+              "models_observed": sorted({m for r in results for m in (r.get("metrics") or {}).get("models", [])}),
+              "budget_usd": a.budget_usd, "budget_source": budget_source,
               "agent_hashes": snapshot(a.agents)["files"], "results": results}
     if a.compare:
         prior = json.loads(a.compare.read_text())

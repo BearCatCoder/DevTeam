@@ -23,9 +23,15 @@ synthetic trace parsing, without a model.
 Explicit **paid live evaluation** opt-in:
 
 ```bash
-python3 evals/run.py --live --scenario backend-fix --model provider/existing-model --timeout 300 --output /tmp/devteam-eval-live
-python3 evals/run.py --live --model provider/existing-model --output /tmp/devteam-eval-all
+python3 evals/run.py --live --scenario backend-fix --timeout 300 --output /tmp/devteam-eval-live
+python3 evals/run.py --live --output /tmp/devteam-eval-all
 ```
+
+Without `--model`, OpenCode uses the operator's selected default, as it does
+when running `@DevTeam` normally; `--model provider/existing-model` overrides it
+for one run. `report.json` records the requested override in `model` (null =
+operator default) and the provider/models the traces actually show in
+`models_observed` (also per scenario in `metrics.models`).
 
 Requires Python 3.9+, Git, Linux/POSIX process groups, OpenCode with `run --agent
 --format json`, `export`, Markdown agents and Task support, and already configured
@@ -38,8 +44,11 @@ needed. No `--auto` permission approval is supplied: noninteractive denials or
 approval waits can yield blocked runs. Do not broaden permissions to force a pass.
 
 Running all scenarios creates many specialist sessions and can incur substantial
-provider cost. Start with one scenario, set a timeout, pass `--budget-usd`, and
-use existing provider budget controls. The runner stops starting new scenarios
+provider cost. Start with one scenario, set a timeout, set the budget ceiling,
+and use existing provider budget controls. The ceiling is `budget_usd` in
+`evals/config.json` (a positive number, or `null` for none); `--budget-usd`
+overrides it for one run, and `--config PATH` selects another file. The report
+records the value used and its source (`budget_source`). The runner stops starting new scenarios
 (recording them `not_run`) once summed reported cost exceeds the budget. It
 checks between scenarios, so one scenario can overshoot; if any prior scenario
 reported no cost, it stops rather than run unbudgeted. Timeouts kill the local
@@ -53,11 +62,11 @@ the agent definitions rather than the harness prompt.
 
 ## First run
 
-Run five representative scenarios with a cheap existing model, then review
-their traces before running the rest:
+Run five representative scenarios with your selected model (or a cheap
+`--model` override), then review their traces before running the rest:
 
 ```bash
-python3 evals/run.py --live --model provider/cheap-existing-model --budget-usd 5 \
+python3 evals/run.py --live \
   --scenario backend-fix --scenario cross-api --scenario docs-only \
   --scenario tool-denial --scenario injection-readme \
   --output /tmp/devteam-eval-first

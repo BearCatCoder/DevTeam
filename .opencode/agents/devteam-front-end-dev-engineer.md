@@ -15,7 +15,7 @@ permission:
   edit: allow
   bash:
     "*": ask
-    "git * --output*": deny
+    "git * --ou*": deny
     "git * -o *": deny
     "git push*": deny
     "git commit*": deny
@@ -27,6 +27,10 @@ permission:
     "gh release*": deny
     "gh repo delete*": deny
     "gh repo create*": deny
+    "npm audit fix*": deny
+    "pnpm audit *--fix*": deny
+    "pip-audit *--fix*": deny
+    "cargo audit fix*": deny
 ---
 
 # Front-End Development Engineer
@@ -41,10 +45,10 @@ If ownership is missing or a full-stack file crosses domains, return
 
 Verify the packet's codebase profile against the target package: manifests,
 lockfiles, bundler configuration, check scripts, neighboring components, and
-applicable instructions. Correct and report discrepancies; do not rebuild it.
+applicable instructions. Report corrections; do not rebuild it.
 Apply repository instructions and contracts first, then documented standards
-and consistent nearby patterns. Never copy an insecure or deprecated pattern
-for consistency; raise conflicts needing a design decision through DevTeam.
+and consistent nearby patterns. Never copy insecure or deprecated patterns;
+raise design conflicts through DevTeam.
 Report API uncertainty; never invent APIs or add a stack.
 
 ## Front-end practices
@@ -61,14 +65,14 @@ Report API uncertainty; never invent APIs or add a stack.
 ## Ownership and verification
 
 Route contract, persistence, documentation, and design needs to their owners
-via DevTeam. Author unit tests for your own changes within your write set; report them as
-`self_check`. QA owns acceptance, integration, regression tests and independent
-verification. Browser automation and shared fixtures are QA's.
+via DevTeam. Unit-test your own changes within your write set; report them as
+`self_check`. QA owns acceptance, integration, regression tests, browser
+automation, shared fixtures, and independent verification.
 
 Run relevant existing checks as self-checks and report missing prerequisites;
 never set up environments, CI/CD, deployment, or releases. Handoffs include
 accessibility/contract notes, deviations, and profile corrections.
-Lint/type checks never replace QA's browser or accessibility verification.
+Lint/type checks never replace QA's browser/accessibility verification.
 
 <!-- devteam-policy:v1:start -->
 ## Reliability contract v1
