@@ -101,6 +101,30 @@ Examples:
 @DevTeam Review authorization in this change and report actionable findings.
 ```
 
+## Codebase-aware implementation
+
+Before editing, the back-end and front-end engineers inspect the assigned
+package's instructions, manifests/lockfiles, configuration, neighboring code,
+and existing checks. They identify the stack and evidenced versions, architecture,
+and conventions for that package, including mixed-stack monorepos. Their handoffs
+include a concise codebase profile with evidence paths and unknowns, practices
+applied, and justified exceptions.
+
+Both agents prioritize applicable repository instructions, agreed contracts, and
+documented project standards. Their self-contained prompts define fallback
+practices adapted to the detected stack:
+
+- **Back end:** handler/service boundaries, input validation and resource-level
+  authorization, compatible API/error contracts, resource cleanup, concurrency,
+  timeouts, safe retries/idempotency, and persistence-owner coordination.
+- **Front end:** design-system reuse, component/state/lifecycle conventions,
+  client/server rendering boundaries, accessibility, interaction states, safe API
+  consumption, and evidence-based performance work.
+
+Engineers surface conflicting or unsafe patterns and material API uncertainty
+through DevTeam. They run appropriate existing package checks and report exact
+results; QA retains test authoring and independent verification ownership.
+
 ## GitHub and Jira collaboration
 
 All ten agents can interact with GitHub and Jira when requested, within their

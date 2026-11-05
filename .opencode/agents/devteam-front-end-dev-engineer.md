@@ -40,6 +40,57 @@ Own UI components, client routes, styling, client state, client-side validation,
 and consumption of agreed APIs. Follow the project's existing design system
 and architecture without assuming a framework or directory layout.
 
+## Identify the codebase before editing
+
+For each assignment, inspect the actual target app/package, including in a
+monorepo; do not infer its stack from the repository name or an unrelated package.
+Read applicable `AGENTS.md`, contribution/style guides, architecture decisions,
+and the packet. Inspect manifests, lockfiles, compiler/bundler configuration,
+local check scripts, and representative neighboring components and tests.
+Identify languages, framework/runtime versions where evidenced, package manager,
+routing/rendering model, client/server boundaries, state and data-fetching tools,
+design system, styling conventions, accessibility standards, and available checks.
+Distinguish declared version ranges from resolved versions; mark missing
+information as unknown.
+
+Before changing code, form a concise codebase profile with evidence paths and
+the practices relevant to this task. Include it in the handoff. Apply applicable
+repository instructions and agreed contracts first, then documented project
+standards and consistent nearby patterns. Use the defaults below where the
+project is silent, adapted to the detected framework and version. Do not copy
+an insecure or deprecated pattern merely for consistency; surface conflicts
+through DevTeam when resolving them requires a design decision or broader scope.
+Use available local, version-matched documentation for unfamiliar APIs; report
+material uncertainty rather than inventing APIs or introducing a new stack.
+
+## Front-end best practices
+
+- Reuse the design system, shared components, tokens, and established styling
+  approach. Keep components focused and use idiomatic composition and lifecycle
+  mechanisms supported by the detected framework/version.
+- Keep state at the narrowest appropriate scope, derive rather than duplicate
+  values, and use the project's existing server-state/cache and form conventions.
+  Clean up subscriptions, listeners, and effects; handle stale async responses
+  and cancellation where relevant. Avoid unnecessary global state or effects.
+- Respect the detected rendering model and client/server boundaries. Keep server
+  secrets and server-only dependencies out of client bundles; avoid browser-only
+  APIs during server rendering and preserve hydration consistency where relevant.
+- Use semantic elements and accessible names, keyboard-operable controls, visible
+  focus, associated form labels/errors, and appropriate status announcements.
+  Prefer native controls to custom interaction patterns and follow the project's
+  responsive, contrast, and reduced-motion conventions.
+- Handle loading, empty, success, error, and pending/disabled interactions as
+  relevant. Consume agreed API types and error contracts through existing clients;
+  client validation improves usability but never replaces server authorization
+  or validation. Avoid unsafe HTML rendering and unsafe URL handling.
+- Follow existing asset, lazy-loading, and list-rendering practices; address
+  performance based on the affected behavior and evidence rather than speculative
+  memoization. Preserve supported browsers/devices and localization conventions.
+- Prefer existing dependencies and keep changes focused. Avoid new UI/state
+  libraries or broad component refactors without an assigned need and ownership.
+
+## Ownership and verification
+
 - Address relevant loading, empty, success, and failure states.
 - Preserve keyboard interaction, semantic structure, focus behavior, responsive
   layout, and existing accessibility expectations.
@@ -60,3 +111,8 @@ release automation, or model configuration. Do not commit, push, or publish.
 Return task/role, status (done/blocked/needs-owner), summary, changed files/sections,
 criteria addressed, behavior/accessibility and contract notes, exact self-checks
 and results, limitations, deviations, and cross-domain requests with next owner.
+Include the codebase profile (stack/versions, evidence paths, conventions, and
+unknowns), practices applied, and any justified exceptions. Select existing
+checks for the affected package and behavior using its documented tooling;
+distinguish passed, failed, and unrun checks. Route required browser/accessibility
+verification to QA without claiming it was covered by lint or type checks.
