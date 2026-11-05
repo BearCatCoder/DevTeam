@@ -65,7 +65,7 @@ they remain available to the coordinator through the Task tool.
 | Database engineer | Data models, schema/migration source, indexes, persistence; unit tests for its changes | Application business logic or live database operations |
 | Dev-admin | Task ledger, ownership, dependencies, handoff completeness | Host/environment administration |
 | QA engineer | Integration/acceptance/regression tests, shared fixtures, all independent verification | Application fixes or scope changes |
-| Security reviewer | Read-only security/privacy findings and fix review | Implementing fixes or accepting risk for the user |
+| Security reviewer | Read-only security/privacy findings, dependency audits, and fix review | Implementing fixes or accepting risk for the user |
 | Documentation writer | User/developer docs and requested durable artifacts | Code, tests, product/design decisions |
 
 **Dev-admin means development-work administration.** It tracks the team's work;
@@ -187,11 +187,19 @@ OpenCode enforces these tool/delegation restrictions:
   the nine named specialists.
 - Specialists cannot delegate to each other, back to DevTeam, or to generic agents.
 - Product owner, architect, dev-admin, and security reviewer have no local edit access.
-- The coordinator, these four specialists, and documentation writer have shell
-  access only for `gh *` commands, with approval (`ask`).
+- The coordinator and these four specialists have read-only git inspection
+  (`status`, `diff`, `rev-parse`, `log`, `show`, `ls-files`; `--output` denied)
+  plus `gh *` with approval. The documentation writer has only `gh *` with
+  approval.
 - The documentation writer has local edit access for its assigned documents.
 - Implementation and QA agents have edit access and `bash: "*": ask` for local
-  checks. A command may require approval; denied commands are reported as blocked.
+  checks (git `--output`/`-o` forms are denied). A command may require
+  approval; denied commands are reported as blocked.
+- The security reviewer may also run dependency audits (`npm audit`,
+  `pnpm audit`, `yarn npm audit`, `pip-audit`, `dotnet list ... --vulnerable`,
+  `cargo audit`, `bundle audit`, `govulncheck`) with approval; their fixer
+  forms (`npm audit fix`, `pnpm audit --fix`, `pip-audit --fix`,
+  `cargo audit fix`) are denied.
 - Every agent denies `git push*`, `git commit*`, `git reset --hard*`,
   `git checkout -- *`, `git clean*`, `rm -rf *`, `gh pr merge*`, `gh release*`,
   `gh repo delete*`, and `gh repo create*`. These denies come after the broader
@@ -199,6 +207,9 @@ OpenCode enforces these tool/delegation restrictions:
   in depth: pattern rules miss rewritten forms such as `git -C dir push` or
   `sh -c "..."`, which the prompts still forbid.
 - Only the coordinator has the `question` tool; specialists return `needs-owner`.
+- Permission rules resolve last-match-wins, so the specific `deny` rules sit
+  after the broader `ask` rule they narrow; `scripts/validate.py` checks the
+  resolved result against the OpenCode CLI. Do not reorder them.
 - GitHub/Jira/Atlassian MCP tool prefixes have `ask` permissions; other tools
   remain denied unless explicitly enabled.
 
@@ -269,6 +280,9 @@ Distinguish **static/resolved configuration checks**, **offline deterministic
 tests** of helpers and simulated traces, and **real model-backed behavior**.
 Even a live run stays inconclusive until its trace and scenario criteria are
 reviewed. No live baseline or efficiency improvement is claimed without runs.
+
+**First live run:** follow the "First run" section of [evals/README.md](evals/README.md):
+`backend-fix`, `cross-api`, `docs-only`, `tool-denial`, `injection-readme`, with `--budget-usd`.
 See [implementation verification record](docs/verification.md) for actual
 commands, results and unverified behavior.
 
@@ -296,8 +310,8 @@ select the roles that receive each section; run `python3 scripts/policy.py
 self-contained Markdown files. Tests also cap prompt size (coordinator 1,400
 words, specialists 650).
 
-CI (`.github/workflows/ci.yml`) runs all three on Python 3.9 and 3.12 for pushes
-and pull requests. It installs OpenCode 1.19.5 from npm for `validate.py`; if
+CI (`.github/workflows/ci.yml`) runs all three on Python 3.9 (on `ubuntu-24.04`,
+which still has a 3.9 build) and 3.12 for pushes and pull requests. It installs OpenCode 1.19.5 from npm for `validate.py`; if
 that install fails, the validation step is skipped with a visible warning and
 job summary note instead of failing the job, so check for that warning before
 treating a green run as validated.

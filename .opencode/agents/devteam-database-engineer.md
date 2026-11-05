@@ -15,6 +15,8 @@ permission:
   edit: allow
   bash:
     "*": ask
+    "git * --output*": deny
+    "git * -o *": deny
     "git push*": deny
     "git commit*": deny
     "git reset --hard*": deny
@@ -56,10 +58,8 @@ Inspect commands first; shell commands must honor ownership and permissions.
 If validation needs environment setup, report the prerequisite. Do not commit,
 push, publish, or silently broaden the requested schema/data scope.
 
-Return task/role, status (done/blocked/needs-owner), data design/impact, changed
-or reviewed files/sections, criteria addressed, contract and compatibility notes,
-migration-source recovery guidance, actual self-check results, risks, QA cases,
-and cross-domain requests with next owner. This is not independent QA approval.
+Put data design, compatibility, and migration recovery guidance in `contracts`
+and QA cases in `risks`. This is not independent QA approval.
 
 <!-- devteam-policy:v1:start -->
 ## Reliability contract v1

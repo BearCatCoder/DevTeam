@@ -27,7 +27,14 @@ DENIED_COMMANDS = (
     "git push", "git push origin main", "git commit -m x", "git reset --hard HEAD",
     "git checkout -- file", "git clean -fdx", "rm -rf build", "gh pr merge 1",
     "gh release create v1", "gh repo delete owner/repo", "gh repo create name",
+    # git diff/log/show can write files with --output/-o.
+    "git diff --output=x", "git log -o x", "git show --output x HEAD",
 )
+# Read-only git inspection: allowed for the coordinator and read-only roles,
+# `ask` for runners (their "*": ask), denied for the documentation writer.
+GIT_READ = ("git status --porcelain", "git diff --stat", "git rev-parse HEAD", "git log -1",
+            "git show HEAD", "git ls-files")
+READ_ONLY = set(NAMES) - WRITERS
 
 
 def permission(agent, tool, target="*"):
@@ -60,6 +67,22 @@ def check(name):
         ), f"{name}: unexpected shell permission for {command}"
     for command in DENIED_COMMANDS:
         assert permission(agent, "bash", command) == "deny", f"{name}: {command} not denied"
+    git_read = "allow" if name in READ_ONLY else "ask" if name in RUNNERS else "deny"
+    for command in GIT_READ:
+        assert permission(agent, "bash", command) == git_read, f"{name}: {command}"
+    # Dependency audits: reviewer may run them (with approval) but never fixers.
+    reviewer = name == "devteam-security-reviewer"
+    for command in ("npm audit", "pip-audit", "dotnet list package --vulnerable",
+                    "pnpm audit --prod", "cargo audit", "govulncheck ./..."):
+        expected = "ask" if reviewer or name in RUNNERS else "deny"
+        assert permission(agent, "bash", command) == expected, f"{name}: {command}"
+    if reviewer:
+        for command in ("npm audit fix", "npm audit fix --force", "pnpm audit --fix",
+                        "pip-audit -r requirements.txt --fix", "cargo audit fix"):
+            assert permission(agent, "bash", command) == "deny", f"{name}: {command}"
+    # Allow rules are read-only commands only; other git verbs stay denied/ask.
+    for command in ("git add .", "git stash", "git branch -D x", "git -C x status"):
+        assert permission(agent, "bash", command) == ("ask" if name in RUNNERS else "deny"), f"{name}: {command}"
     for tool in ("github_get_issue", "github_create_pull_request",
                  "jira_get_issue", "jira_update_issue", "atlassian_transition_issue"):
         assert permission(agent, tool) == "ask", f"{name}: {tool} unavailable"

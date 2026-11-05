@@ -115,16 +115,24 @@ null exit code, kind `review`, and evidence. Unrun/blocked checks have null exit
 codes. Every check's state ID must match its handoff. Never fabricate command
 execution to satisfy this schema.
 
-**state_id sources.** The coordinator puts a `state_id` in every packet, read
-with the read tool from `.git/HEAD` and the ref file it names, formatted
-`head:<sha>;dirty:unknown` (`none` without `.git`). Specialists copy it into the
+**state_id sources.** The coordinator puts a `state_id` in every packet,
+derived as `head:<sha>;dirty:<true|false>` from `git rev-parse HEAD` and whether
+`git status --porcelain --untracked-files=all` prints anything (`none` without a
+repository). Specialists copy it into the
 handoff and each check, so read-only roles without shell access can return
 `done`. A role that runs `scripts/workflow.py snapshot` may substitute the
 64-hex snapshot id and must say so in `limitations`. `analyze` and `document`
-handoffs never block on `state_id`. A `head:` id does not capture uncommitted
-changes, which is why it says `dirty:unknown`: it identifies the code version
-reviewed but does not prove the working tree was unchanged. Gate acceptance on
-the scope audit's snapshot id where precise state matters.
+handoffs never block on `state_id`. `dirty:true` says uncommitted changes
+exist but not which; two dirty states share one id. `dirty:unknown` remains
+valid for older packets. Gate acceptance on the scope audit's snapshot id where
+precise state matters.
+
+The coordinator's built-in audit (without this helper) records
+`git status --porcelain --untracked-files=all` and `git diff --stat` before each
+writer and compares them afterward. It sees changed paths and tracked-file
+line counts, but not further edits to an already-untracked file or edits that
+leave a dirty file's line counts unchanged, so same-file user edits still need
+review.
 
 ```bash
 python3 scripts/workflow.py handoff --input examples/handoff.json

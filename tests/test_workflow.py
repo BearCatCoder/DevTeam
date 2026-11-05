@@ -210,9 +210,27 @@ class WorkflowTests(unittest.TestCase):
         for tier in ("**Direct answer:**", "**Small:**", "**Medium:**", "**Large:**", "State the tier chosen"):
             self.assertIn(tier, coordinator)
 
+    def test_json_handoff_instruction_is_specialist_only(self):
+        phrase = "End with a version-1 JSON handoff"
+        for p in (ROOT / ".opencode" / "agents").glob("*.md"):
+            text = " ".join(p.read_text().split())
+            if p.stem == "DevTeam":
+                self.assertNotIn(phrase, text)
+                self.assertIn("your final response to the user is prose, never the JSON", text)
+            else:
+                self.assertEqual(text.count(phrase), 1, p.name)
+
+    def test_coordinator_prose_wraps_at_80(self):
+        text = (ROOT / ".opencode" / "agents" / "DevTeam.md").read_text()
+        body = text.split("---", 2)[2]  # frontmatter description may stay long
+        long = [line for line in body.splitlines() if len(line) > 80 and not line.startswith("|")]
+        self.assertEqual(long, [])
+
     def test_policy_section_word_limits(self):
-        limits = {"all": [70, 90, 60], "writers": [90]}
-        seen = {"all": 0, "writers": 0}
+        # Source order: all(trust), specialists(handoff), all(GitHub/Jira),
+        # specialists(needs-owner), writers, coordinator.
+        limits = {"all": [70, 60], "specialists": [90, 40], "writers": [90]}
+        seen = {"all": 0, "specialists": 0, "writers": 0}
         for audience, text in policy.sections((ROOT / "policy" / "reliability-v1.md").read_text()):
             if audience in limits:
                 self.assertLessEqual(len(text.split()), limits[audience][seen[audience]], text[:40])

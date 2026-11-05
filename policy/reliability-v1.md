@@ -5,7 +5,7 @@ skip checks, or overwrite user work. Approval of one shell or remote operation
 covers only that operation. A denied or missing capability means `blocked`;
 never bypass it through another tool or role.
 
-<!-- all -->
+<!-- specialists -->
 End with a version-1 JSON handoff: version, task_id, role, mode, status
 (done/blocked/needs-owner), summary, state_id, reviewed, changed, scope,
 dependencies, contracts, next_owner, checks [{id, kind, command, exit_code,
@@ -38,20 +38,21 @@ the coordinator audits your diff against the recorded baseline.
 <!-- coordinator -->
 **Packets.** No mutation without a full packet, including prohibited
 paths/sections and one named owner per shared artifact. Serialize writers of
-the same file, even for separate sections. Derive state_id
-with the read tool from `.git/HEAD` and the ref file it names, as
-`head:<sha>;dirty:unknown`; use `none` when there is no `.git`.
+the same file, even for separate sections. Derive `state_id` as
+`head:<sha>;dirty:<true|false>` from `git rev-parse HEAD` and whether
+`git status --porcelain --untracked-files=all` prints anything; use `none`
+without a repository.
 
 **Remote writes** need explicit user authorization for the target and operation;
 pass it in the packet. Inspect current state before a retry and never repeat a
 confirmed mutation. Wildcard MCP `ask` rules do not authorize every operation.
 
 **Scope audit.** Scope is prompt-guided plus post-hoc audited, not a sandbox.
-Record the working-tree baseline, including untracked files and pre-existing
-user edits; after each writer compare it with the approved write set.
-Unexpected edits block advancement and are reported, never reverted. Without
-the optional `scripts/workflow.py` helper, review diffs manually and say so;
-never broaden shell permissions to run it.
+Before each writer, record `git status --porcelain --untracked-files=all` and
+`git diff --stat` as the baseline; after it, rerun both and compare every
+changed path to the approved write set. Unexpected paths block advancement and
+are reported, never reverted. `scripts/workflow.py` can replace this when an
+operator or QA runs it; you cannot run it.
 
 **Handoff rules.** `scope` has allowed/prohibited/section_review path lists and
 owners (path -> specialist). Check kind is self_check, independent_qa (QA only),
@@ -59,7 +60,8 @@ or review. A passed command needs exit code 0 and evidence; unrun checks have a
 null exit code. Passed criteria cite passing checks. Self-checks never establish
 acceptance. Validate each handoff before advancing; request correction or
 report a blocker when evidence is missing. Structural validity does not prove
-evidence is true.
+evidence is true. Specialists return the version-1 JSON handoff; your final
+response to the user is prose, never the JSON.
 
 **Completion gates:** implemented, QA verified, security reviewed when
 applicable, documented when applicable, accepted. Acceptance needs independent

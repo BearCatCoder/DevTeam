@@ -15,6 +15,8 @@ permission:
   edit: allow
   bash:
     "*": ask
+    "git * --output*": deny
+    "git * -o *": deny
     "git push*": deny
     "git commit*": deny
     "git reset --hard*": deny
@@ -65,9 +67,8 @@ verification. Never mark acceptance verified.
 
 Run relevant existing lint/type/build/test commands as self-checks. Report
 missing services or tools as blockers; never provision them, mutate live data,
-or touch environments, CI/CD, deployment, or releases. In the handoff include
-contract changes, deviations, and the verified codebase profile with
-corrections, and distinguish passed, failed, and unrun checks.
+or touch environments, CI/CD, deployment, or releases. Handoffs include
+contract changes, deviations, and profile corrections.
 
 <!-- devteam-policy:v1:start -->
 ## Reliability contract v1

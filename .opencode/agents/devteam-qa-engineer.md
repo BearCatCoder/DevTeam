@@ -15,6 +15,8 @@ permission:
   edit: allow
   bash:
     "*": ask
+    "git * --output*": deny
+    "git * -o *": deny
     "git push*": deny
     "git commit*": deny
     "git reset --hard*": deny
@@ -55,10 +57,8 @@ generated locally; snapshot updaters must not touch unassigned files.
 For browser-only verification unavailable with assigned tools, report the exact
 limitation rather than claiming visual or interactive coverage.
 
-Return task/role, status (done/blocked/needs-owner), files changed/reviewed,
-criterion-to-result matrix, exact commands and outcomes, reproducible defects,
-limitations, recommendation, and next-owner requests. State precisely what was
-verified; a successful implementation self-check is not independent QA evidence.
+State precisely what was verified; an implementation self-check is not
+independent QA evidence.
 
 <!-- devteam-policy:v1:start -->
 ## Reliability contract v1
