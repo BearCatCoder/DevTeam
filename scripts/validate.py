@@ -45,6 +45,16 @@ def check(name):
     assert not agent.get("options"), f"{name}: unexpected provider options"
     assert permission(agent, "edit") == ("allow" if name in WRITERS else "deny")
     assert permission(agent, "bash") == ("ask" if name in RUNNERS else "deny")
+    assert permission(agent, "bash", "gh issue list") == "ask"
+    assert permission(agent, "bash", "gh pr comment 42 --body review") == "ask"
+    for command in ("git push", "python3 script.py", "gh-unrelated command"):
+        assert permission(agent, "bash", command) == (
+            "ask" if name in RUNNERS else "deny"
+        ), f"{name}: unexpected shell permission for {command}"
+    for tool in ("github_get_issue", "github_create_pull_request",
+                 "jira_get_issue", "jira_update_issue", "atlassian_transition_issue"):
+        assert permission(agent, tool) == "ask", f"{name}: {tool} unavailable"
+    assert permission(agent, "unrelated_update_issue") == "deny"
     assert permission(agent, "read") == "allow"
     assert permission(agent, "unconfigured_mcp_tool") == "deny"
     assert permission(agent, "task", "general") == "deny"
@@ -62,7 +72,7 @@ def main():
     try:
         with ThreadPoolExecutor(max_workers=3) as pool:
             for name in pool.map(check, NAMES):
-                print(f"PASS {name}: loaded, mode, permissions, delegation, prompt, model neutrality")
+                print(f"PASS {name}: loaded, mode, permissions, GitHub/Jira access, delegation, prompt, model neutrality")
     except (OSError, ValueError, KeyError, AssertionError, subprocess.SubprocessError) as error:
         print(f"FAIL: {error}", file=sys.stderr)
         return 1

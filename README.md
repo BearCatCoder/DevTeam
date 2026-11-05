@@ -6,7 +6,8 @@ a structured handoff. The coordinator assigns work, resolves dependencies, and
 routes fixes to the responsible specialist.
 
 DevTeam covers **requirements, design, development, testing, application-security
-review, and documentation**. It is project-, stack-, model-, and provider-agnostic.
+review, documentation, and requested GitHub/Jira collaboration**. It is project-,
+account-, stack-, model-, and provider-agnostic.
 It discovers conventions from the active repository and its applicable instructions.
 No model IDs, provider configuration, project paths, or service targets are embedded.
 
@@ -66,7 +67,7 @@ they remain available to the coordinator through the Task tool.
 | Documentation writer | User/developer docs and requested durable artifacts | Code, tests, product/design decisions |
 
 **Dev-admin means development-work administration.** It tracks the team's work;
-it has no shell or edit access and is not an operations role.
+it has no local edit access and can use `gh` for requested GitHub collaboration.
 
 Engineers can run existing checks as development self-checks. QA owns writing
 tests and independently verifying acceptance. If QA finds a backend defect, the
@@ -100,18 +101,55 @@ Examples:
 @DevTeam Review authorization in this change and report actionable findings.
 ```
 
+## GitHub and Jira collaboration
+
+All ten agents can interact with GitHub and Jira when requested, within their
+assigned roles. Examples include reading issues and pull requests, creating or
+updating work items, posting review findings or QA evidence, and maintaining
+requested task status. DevTeam passes remote targets and authorized operations
+to specialists and serializes updates to the same remote item.
+
+- **GitHub:** use an already installed/authenticated `gh` CLI or configured
+  GitHub MCP integration.
+- **Jira:** use an already configured/authenticated Jira or Atlassian MCP
+  integration. Agents discover applicable fields and workflow transitions.
+- MCP tool permissions recognize `github_*`, `jira_*`, and `atlassian_*` tool
+  names with `ask`. If your integration uses another prefix, add an equivalent
+  permission for its actual tool names to the relevant agent definitions in
+  your OpenCode configuration. These prefixes are naming conventions, not
+  embedded server URLs or accounts; permission rules do not install MCP servers.
+- Targets come from your request, the active repository, or integration context.
+  Agents ask when ambiguous and report missing authentication/tools as blockers.
+  No account, organization, repository, Jira site/project, or credential is bundled.
+
+For example:
+
+```text
+@DevTeam Review the GitHub PR at <PR URL> and post the security findings there.
+@DevTeam Read <Jira issue URL>, implement its acceptance criteria, and add QA evidence as a comment.
+@DevTeam Create Jira work items in <project URL> for the agreed implementation plan.
+```
+
+Collaboration actions may prompt for tool approval. The user request and role
+still determine scope. This support covers development collaboration; commits,
+pushes, merges, releases, deployment, and account/repository administration remain
+outside the team's scope. Completion reports include confirmed URLs/issue keys.
+
 ## Isolation and permissions
 
 OpenCode enforces these tool/delegation restrictions:
 
-- The coordinator cannot edit or run shell commands; it can delegate only to
+- The coordinator cannot edit; it can delegate only to
   the nine named specialists.
 - Specialists cannot delegate to each other, back to DevTeam, or to generic agents.
-- Product owner, architect, dev-admin, and security reviewer have no edit or shell access.
-- The documentation writer has edit access but no shell access.
+- Product owner, architect, dev-admin, and security reviewer have no local edit access.
+- The coordinator, these four specialists, and documentation writer have shell
+  access only for `gh *` commands, with approval (`ask`).
+- The documentation writer has local edit access for its assigned documents.
 - Implementation and QA agents have edit access and `bash: ask` for local checks.
   A command may require approval; denied commands must be reported as blocked.
-- Unconfigured tools, including MCP tools, are denied by default for these agents.
+- GitHub/Jira/Atlassian MCP tool prefixes have `ask` permissions; other tools
+  remain denied unless explicitly enabled.
 
 **Domain/file ownership is an instruction-level contract, not a filesystem
 sandbox.** Separate sessions share the same checkout. Since this package does
@@ -138,7 +176,8 @@ python3 scripts/validate.py
 The first command tests installation, idempotence, collision preflight, explicit
 updates, and symlink handling. The second asks OpenCode to resolve all ten agents
 and checks modes, visibility, exact prompts, model neutrality, edit/shell access,
-and allowed/denied delegation. It makes no model calls and does not prove
+GitHub/Jira collaboration permissions, and allowed/denied delegation. It makes
+no model calls or authenticated GitHub/Jira requests and does not prove
 end-to-end model behavior.
 
 To inspect installation from a target project, run:
