@@ -39,6 +39,8 @@ GIT_READ = ("git status --porcelain", "git diff --stat", "git rev-parse HEAD", "
             "git show HEAD", "git ls-files", "git log --oneline -5")
 READ_ONLY = set(NAMES) - WRITERS
 
+PASS_DETAIL = "loaded, mode, permissions, GitHub/Jira access, delegation, prompt, model neutrality"
+
 
 def permission(agent, tool, target="*"):
     action = None
@@ -48,12 +50,22 @@ def permission(agent, tool, target="*"):
     return action
 
 
-def check(name):
+def resolve(name):
     result = subprocess.run(
         ["opencode", "debug", "agent", name], cwd=ROOT,
-        capture_output=True, text=True, timeout=120, check=True,
+        capture_output=True, text=True, timeout=120,
     )
-    agent = json.loads(result.stdout)
+    if result.returncode != 0:
+        # Surface OpenCode's own error instead of a bare exit status.
+        output = (result.stderr.strip() or result.stdout.strip() or "(no output)")[-4000:]
+        raise subprocess.SubprocessError(
+            f"opencode debug agent {name} exited {result.returncode}:\n{output}"
+        )
+    return json.loads(result.stdout)
+
+
+def check(name):
+    agent = resolve(name)
     assert agent["name"] == name, f"{name}: not loaded"
     assert agent["mode"] == ("all" if name == "DevTeam" else "subagent")
     assert bool(agent.get("hidden")) == (name != "DevTeam")
@@ -108,9 +120,12 @@ def check(name):
 
 def main():
     try:
+        # Resolve the first agent alone so OpenCode's first-run setup (data
+        # directories, caches) cannot race between parallel processes.
+        print(f"PASS {check(NAMES[0])}: {PASS_DETAIL}")
         with ThreadPoolExecutor(max_workers=3) as pool:
-            for name in pool.map(check, NAMES):
-                print(f"PASS {name}: loaded, mode, permissions, GitHub/Jira access, delegation, prompt, model neutrality")
+            for name in pool.map(check, NAMES[1:]):
+                print(f"PASS {name}: {PASS_DETAIL}")
     except (OSError, ValueError, KeyError, AssertionError, subprocess.SubprocessError) as error:
         print(f"FAIL: {error}", file=sys.stderr)
         return 1
