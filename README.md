@@ -55,6 +55,44 @@ the project you want the team to work on, then use:
 specialists are hidden from mention autocomplete to keep the entry point simple;
 they remain available to the coordinator through the Task tool.
 
+## Claude Code
+
+A Claude Code port lives in `.claude/`: the nine specialists as subagents in
+`.claude/agents/`, and the coordinator as a `/devteam` skill in
+`.claude/skills/devteam/SKILL.md`. Claude Code subagents cannot start other
+subagents, so the coordinator runs in the main conversation and delegates
+through the Agent tool. Inside this repository Claude Code discovers them
+automatically. To install them for all projects:
+
+```bash
+mkdir -p ~/.claude/agents ~/.claude/skills
+cp .claude/agents/devteam-*.md ~/.claude/agents/
+cp -r .claude/skills/devteam ~/.claude/skills/
+```
+
+Restart Claude Code, then use:
+
+```text
+/devteam Fix this API regression and add regression coverage.
+```
+
+Differences from the OpenCode definitions:
+
+- **No prompts.** Specialists set `permissionMode: bypassPermissions`, and the
+  skill pre-approves its tools in `allowed-tools`. OpenCode's per-command
+  `deny` rules have no frontmatter equivalent, so the command prohibitions are
+  instructions in each prompt, not enforced blocks. Change the specialists to
+  `acceptEdits` to be asked before shell commands again.
+- **Commits, pushes, and merges.** The coordinator may create a branch, commit,
+  push, and open and merge pull requests when the request asks for it, after QA
+  passes and the scope audit is clean. It never force-pushes, rewrites history,
+  releases, or deploys. Specialists still never commit, push, or merge.
+- **Tools.** Read-only roles get `Read, Grep, Glob, Bash`; engineers, QA, and
+  the writer also get `Edit, Write`.
+
+To uninstall, delete the nine `devteam-*.md` files from `~/.claude/agents/`
+and the `~/.claude/skills/devteam/` folder.
+
 ## Team boundaries
 
 | Specialist | Owns | Does not do |
@@ -339,6 +377,7 @@ by this repository from your chosen installation directory, then restart OpenCod
 
 ```text
 .opencode/agents/    Coordinator and nine self-contained specialist definitions
+.claude/            Claude Code port: nine subagents and the /devteam skill
 scripts/install.py  Global or project-local installer
 scripts/validate.py Resolved OpenCode configuration checks
 tests/              Installer, helper, policy, and offline eval regression checks
